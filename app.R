@@ -47,8 +47,22 @@ cat("Joining datasets...\n")
 
 individualdata <- individualdata %>%
   left_join(
-    ...
+    crashdata %>%
+      select(
+        CrashId,
+        Year,
+        `Weather Condition Text Format`,
+        `Light Condition Text Format`,
+        `Road Surface Condition Text Format`,
+        `Day of the Week Text Format`,
+        `Hour of the Day`,
+        `Time of Crash`,
+        `Most harmful event`
+      ),
+    by = "CrashId"
   )
+
+cat("Finished joining datasets.\n")
 
 cat("Finished joining datasets.\n")
 

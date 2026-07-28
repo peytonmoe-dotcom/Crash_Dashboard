@@ -1,3 +1,6 @@
+cat("Running:", normalizePath("."), "\n")
+cat("This file is being executed.\n")
+
 #SETTING UP SHINY DASHBOARD
 library(shiny)
 library(shinydashboard)
@@ -9,8 +12,6 @@ library(sf)
 library(readxl)
 library(DT)
 #library(terra)
-
- 
 
 crashdata <- read.csv(
   "export_213299_0.csv",

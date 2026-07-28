@@ -1,27 +1,32 @@
+cat("Source_Info.R has started\n")
+cat("crashdata exists:", exists("crashdata"), "\n")
+cat("Rows:", nrow(crashdata), "\n")
+
 library(dplyr)
 
+cat("After library(dplyr)\n")
 
+#==================================================
+# OVERALL TRENDS TAB
+#==================================================
 
-#OVERALL TRENDS TAB 
-
-#getting weather count 
+cat("Starting weather_count\n")
 weather_count <- crashdata |> count(`Weather Condition Text Format`)
-weather_count
+cat("Finished weather_count\n")
 
-#light count
+cat("Starting light_count\n")
 light_count <- crashdata |> count(`Light Condition Text Format`)
-light_count
+cat("Finished light_count\n")
 
-#road surface count 
+cat("Starting roadsurface_count\n")
 roadsurface_count <- crashdata |> count(`Road Surface Condition Text Format`)
-roadsurface_count 
+cat("Finished roadsurface_count\n")
 
-#day of the week count
+cat("Starting day_count\n")
 
-#changing to factor variable
 crashdata$`Day of the Week Text Format` <- factor(
   crashdata$`Day of the Week Text Format`,
-  levels=c(
+  levels = c(
     "Sunday",
     "Monday",
     "Tuesday",
@@ -31,27 +36,30 @@ crashdata$`Day of the Week Text Format` <- factor(
     "Saturday"
   )
 )
-day_count <- crashdata |> count(`Day of the Week Text Format`)
-day_count
 
-#time of day count
-#creating time bins
+day_count <- crashdata |> count(`Day of the Week Text Format`)
+
+cat("Finished day_count\n")
+
+cat("Starting time_count\n")
 
 time_count <- crashdata %>%
-        mutate(timebins=case_when(
-        `Hour of the Day` >=0 & `Hour of the Day` < 3 ~ "12-2:59 am",
-        `Hour of the Day` >=3 & `Hour of the Day` < 6 ~ "3-5:59 am",
-        `Hour of the Day` >=6 & `Hour of the Day` < 9  ~ "6-8:59 am",
-        `Hour of the Day` >=9 & `Hour of the Day` < 12 ~ "9-11:59 am",
-        `Hour of the Day` >=12 & `Hour of the Day` < 15 ~ "12-2:59 pm",
-        `Hour of the Day` >=15 & `Hour of the Day` < 18 ~ "3-5:59 pm",
-        `Hour of the Day` >=18 & `Hour of the Day` < 21 ~ "6-8:59 pm",
-        `Hour of the Day` >=21 & `Hour of the Day` < 24 ~ "9-11:59 pm",
-        TRUE ~ NA_character_
-)
+  mutate(
+    timebins = case_when(
+      `Hour of the Day` >= 0 & `Hour of the Day` < 3 ~ "12-2:59 am",
+      `Hour of the Day` >= 3 & `Hour of the Day` < 6 ~ "3-5:59 am",
+      `Hour of the Day` >= 6 & `Hour of the Day` < 9 ~ "6-8:59 am",
+      `Hour of the Day` >= 9 & `Hour of the Day` < 12 ~ "9-11:59 am",
+      `Hour of the Day` >= 12 & `Hour of the Day` < 15 ~ "12-2:59 pm",
+      `Hour of the Day` >= 15 & `Hour of the Day` < 18 ~ "3-5:59 pm",
+      `Hour of the Day` >= 18 & `Hour of the Day` < 21 ~ "6-8:59 pm",
+      `Hour of the Day` >= 21 & `Hour of the Day` < 24 ~ "9-11:59 pm",
+      TRUE ~ NA_character_
+    )
   ) %>%
   count(timebins)
-  time_count$timebins <- factor(
+
+time_count$timebins <- factor(
   time_count$timebins,
   levels = c(
     "12-2:59 am",
@@ -65,39 +73,47 @@ time_count <- crashdata %>%
   )
 )
 
-#fatal time count
-  fataltime_count <- individualdata %>%
-    mutate(fataltimebins=case_when(
-      `Hour of the Day` >=0 & `Hour of the Day` < 3 ~ "12-2:59 am",
-      `Hour of the Day` >=3 & `Hour of the Day` < 6 ~ "3-5:59 am",
-      `Hour of the Day` >=6 & `Hour of the Day` < 9  ~ "6-8:59 am",
-      `Hour of the Day` >=9 & `Hour of the Day` < 12 ~ "9-11:59 am",
-      `Hour of the Day` >=12 & `Hour of the Day` < 15 ~ "12-2:59 pm",
-      `Hour of the Day` >=15 & `Hour of the Day` < 18 ~ "3-5:59 pm",
-      `Hour of the Day` >=18 & `Hour of the Day` < 21 ~ "6-8:59 pm",
-      `Hour of the Day` >=21 & `Hour of the Day` < 24 ~ "9-11:59 pm",
+cat("Finished time_count\n")
+
+cat("Hour columns:\n")
+print(grep("Hour", names(individualdata), value = TRUE))
+
+cat("Starting fataltime_count\n")
+
+fataltime_count <- individualdata %>%
+  mutate(
+    fataltimebins = case_when(
+      `Hour of the Day` >= 0 & `Hour of the Day` < 3 ~ "12-2:59 am",
+      `Hour of the Day` >= 3 & `Hour of the Day` < 6 ~ "3-5:59 am",
+      `Hour of the Day` >= 6 & `Hour of the Day` < 9 ~ "6-8:59 am",
+      `Hour of the Day` >= 9 & `Hour of the Day` < 12 ~ "9-11:59 am",
+      `Hour of the Day` >= 12 & `Hour of the Day` < 15 ~ "12-2:59 pm",
+      `Hour of the Day` >= 15 & `Hour of the Day` < 18 ~ "3-5:59 pm",
+      `Hour of the Day` >= 18 & `Hour of the Day` < 21 ~ "6-8:59 pm",
+      `Hour of the Day` >= 21 & `Hour of the Day` < 24 ~ "9-11:59 pm",
       TRUE ~ NA_character_
     )
-    ) %>%
-    count(fataltimebins)
-  fataltime_count$fataltimebins <- factor(
-    fataltime_count$fataltimebins,
-    levels = c(
-      "12-2:59 am",
-      "3-5:59 am",
-      "6-8:59 am",
-      "9-11:59 am",
-      "12-2:59 pm",
-      "3-5:59 pm",
-      "6-8:59 pm",
-      "9-11:59 pm"
-    )
+  ) %>%
+  count(fataltimebins)
+
+fataltime_count$fataltimebins <- factor(
+  fataltime_count$fataltimebins,
+  levels = c(
+    "12-2:59 am",
+    "3-5:59 am",
+    "6-8:59 am",
+    "9-11:59 am",
+    "12-2:59 pm",
+    "3-5:59 pm",
+    "6-8:59 pm",
+    "9-11:59 pm"
   )
-  
+)
 
-#most harmful event
+cat("Finished fataltime_count\n")
 
-#creating other harmful event category 
+cat("Starting harmful_event_group\n")
+
 crashdata <- crashdata %>%
   mutate(
     HarmfulEventGroup = case_when(
@@ -137,18 +153,15 @@ crashdata <- crashdata %>%
         "Equipment Failure (blown tire, brake failure, etc.)",
         "Cross Median"
       ) ~ "Other Harmful Event",
-      #all else 
       TRUE ~ `Most harmful event`
     )
   )
-  
-harmful_count <- crashdata |> count(`HarmfulEventGroup`)
-harmful_count
 
+harmful_count <- crashdata |> count(HarmfulEventGroup)
 
-#contributing action by driver 
+cat("Finished harmful_event_group\n")
 
-#creating other contributing action category
+cat("Starting contributing_action_group\n")
 
 individualdata <- individualdata %>%
   mutate(
@@ -167,7 +180,6 @@ individualdata <- individualdata %>%
         "Over-Correcting/Over-Steering",
         "Not Applicable"
       ) ~ "Other Contributing Action",
-      
       TRUE ~ `Driver Actions 1 Text Format`
     )
   )
@@ -176,15 +188,12 @@ contributing_action_count <- individualdata %>%
   filter(!is.na(contributing_group)) %>%
   count(contributing_group, sort = TRUE)
 
-table(individualdata$`contributing_group`)
+cat("Finished contributing_action_group\n")
 
-
-#crashes per year 
+cat("Starting crashes_per_year\n")
 table(crashdata$Year)
+cat("Finished crashes_per_year\n")
 
-#neighborhood 
+cat("Starting neighborhood_count\n")
 neighborhood_crash_count <- neighborhood$MVA
-neighborhood_crash_count
-
-
-
+cat("Finished neighborhood_count\n")

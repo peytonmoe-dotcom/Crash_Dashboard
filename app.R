@@ -301,7 +301,7 @@ ui <- dashboardPage(
         h4("Crash Maps",
           style="font-size:35px"
         ),
-        h4("The following maps are interative. Zoom in and click on a dot to see the features"),
+        h4("The following maps are interative. For all crashes and fatalitis, zoom in and click on a dot to see additional features"),
         selectInput(
           inputId = "mapType",
           label = "Select Map",

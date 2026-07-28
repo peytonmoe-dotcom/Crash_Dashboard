@@ -241,7 +241,7 @@ ui <- dashboardPage(
         
         h4("Overview Statement", style="text-decoration:underline; font-size: 32px;"),  
         
-        h3("The New Haven real-time crash dashboard is designed to visualize and explore motor vehicle crashes
+        h3("The New Haven Crash Dashboard is designed to visualize and explore motor vehicle crashes
          with at least 1 possible injury. Any crashes with no apparent injuries and/or property damage only are excluded from
          this dashboard. Users can interact with the maps, charts, and filters to examine crash patterns, contributing actions, and
          spatiotemporal trends that can support data-driven traffic safety analysis, decision-making, and safety improvements for 
@@ -260,7 +260,8 @@ ui <- dashboardPage(
         
         h4("Additional Information", style="text-decoration:underline; font-size:32px"),
         h3("The first four tabs are data from 1/1/21-6/11/26 (5.5 year analysis span), while the last tab
-           is for information about crashes and fatalities after 6/11/26.", style="font-size:20px;")
+           is for information about crashes and fatalities after 6/11/26 that is updated nightly from the UConn crash servers. 
+           NOTE: it may take up to 60 seconds for all features and maps to load. ", style="font-size:20px;")
         ,
         
         

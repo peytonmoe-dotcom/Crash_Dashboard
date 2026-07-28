@@ -181,7 +181,7 @@ cat("crashdata loaded:", exists("crashdata"), "\n")
 cat("crashdata rows:", nrow(crashdata), "\n")
 
 cat("Starting Source_Info.R\n")
-source("Source_Info.R")
+source("Source_Info.R", local = environment())
 cat("Finished Source_Info.R\n")
 
 ui <- dashboardPage(

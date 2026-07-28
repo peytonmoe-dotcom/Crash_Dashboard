@@ -13,17 +13,26 @@ library(readxl)
 library(DT)
 #library(terra)
 
+cat("Loading crashdata...\n")
+
 crashdata <- read.csv(
   "export_213299_0.csv",
   check.names = FALSE
 )
+
+cat("Crashdata loaded:", nrow(crashdata), "rows\n")
+
+cat("Loading individualdata...\n")
 
 individualdata <- read.csv(
   "export_213299_2_clean.csv",
   check.names = FALSE
 )
 
-# Make duplicate column names unique while preserving spaces
+cat("Individualdata loaded:", nrow(individualdata), "rows\n")
+
+cat("Making column names unique...\n")
+
 names(crashdata) <- make.unique(
   names(crashdata),
   sep = "_duplicate"
@@ -34,23 +43,14 @@ names(individualdata) <- make.unique(
   sep = "_duplicate"
 )
 
+cat("Joining datasets...\n")
+
 individualdata <- individualdata %>%
   left_join(
-    crashdata %>%
-      select(
-        CrashId,
-        Year,
-        `Weather Condition Text Format`,
-        `Light Condition Text Format`,
-        `Road Surface Condition Text Format`,
-        `Day of the Week Text Format`,
-        `Hour of the Day`,
-        `Time of Crash`,
-        `Most harmful event`
-      ),
-    by = "CrashId"
+    ...
   )
 
+cat("Finished joining datasets.\n")
 
 
 
@@ -162,7 +162,13 @@ crashdata$longitude <- as.numeric(crashdata$longitude)
 
 
 #SOURCE CODE via Source_Info
+
+cat("crashdata loaded:", exists("crashdata"), "\n")
+cat("crashdata rows:", nrow(crashdata), "\n")
+
+cat("Starting Source_Info.R\n")
 source("Source_Info.R")
+cat("Finished Source_Info.R\n")
 
 ui <- dashboardPage(
   

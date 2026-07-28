@@ -1,0 +1,12 @@
+name: NewHaven_Crash_Dashboard
+title: NewHaven_Crash_Dashboard
+username: cmrt34-peyton-moe
+account: cmrt34-peyton-moe
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 17639488
+bundleId: 12316742
+url: https://cmrt34-peyton-moe.shinyapps.io/NewHaven_Crash_Dashboard/
+version: 1
+asMultiple: FALSE
+asStatic: FALSE

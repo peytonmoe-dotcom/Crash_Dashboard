@@ -260,7 +260,7 @@ ui <- dashboardPage(
         
         h4("Additional Information", style="text-decoration:underline; font-size:32px"),
         h3("The first four tabs are data from 1/1/21-6/11/26 (5.5 year analysis span), while the last tab
-           is for information about crashes and fatalities after 6/11/26 that is updated nightly from the UConn crash servers. 
+           contains real-time information from the last 30 or 90 days that is updated daily from the UConn crash servers. 
            NOTE: it may take up to 60 seconds for all features and maps to load. ", style="font-size:20px;")
         ,
         

@@ -241,11 +241,10 @@ ui <- dashboardPage(
         
         h4("Overview Statement", style="text-decoration:underline; font-size: 32px;"),  
         
-        h3("The New Haven Crash Dashboard is designed to visualize and explore motor vehicle crashes
-         with at least 1 possible injury. Any crashes with no apparent injuries and/or property damage only are excluded from
-         this dashboard. Users can interact with the maps, charts, and filters to examine crash patterns, contributing actions, and
+        h3("The New Haven Crash Dashboard is designed to visualize and explore motor vehicle crashes. Users can interact with the maps, charts, and filters to examine crash patterns, contributing actions, and
          spatiotemporal trends that can support data-driven traffic safety analysis, decision-making, and safety improvements for 
-         all users.", style="font-size:20px;")
+         all users. Some maps only use crashes with at least 1 possible injury and some maps include crahses with all injury types 
+           (including no injuries). Please see text boxes with more information. ", style="font-size:20px;")
         
         ,
         
@@ -301,48 +300,45 @@ ui <- dashboardPage(
         h4("Crash Maps",
           style="font-size:35px"
         ),
-        h4("The following maps are interative. For all crashes and fatalitis, zoom in and click on a dot to see additional features"),
+        h4("The following maps are interative. For all crashes, fatalities, and pedestrian injuries zoom in and click on a dot to see additional features"),
         selectInput(
           inputId = "mapType",
           label = "Select Map",
           choices = c(
             "All Crashes Map" = "crashes",
             "Crash Severity Index Map" = "severity",
-            "All Fatalities Map" = "fatalities"
+            "All Fatalities Map" = "fatalities",
+            "All Pedestrian Injuries and Fatalities" = "pedestrian"
           ),
           selected = "crashes"
         ),
         
-        leafletOutput(
-          "overviewMap",
-          height = "600px"
-        ),
-        conditionalPanel(
-          condition = "input.mapType == 'severity'",
+        tags$details(
+          open = TRUE,
+          
+          tags$summary(
+            style = "font-weight: bold; font-size: 18px; cursor: pointer;",
+            "About this map"
+          ),
           
           div(
             style = "
+      padding: 12px;
+      margin-top: 8px;
       background-color: white;
-      padding: 15px;
-      margin-top: 15px;
-      border-radius: 5px;
-                              ",
+      border-radius: 6px;
+    ",
             
-            h4("About the Severity Index Map"),
-            
-            p(
-              "The Severity Index Map identifies roadway segments with crashes involving
-      greater levels of injury severity. Each crash is assigned a weight based on
-      its most severe injury outcome. 
-      
-      The formula used to calculate Severity Index is =  
-      (12 * Number of Fatals) + (3 * Suspected Serious Injury) + (1 * Suspected Minor or Possible Injury)"
-            ),
-            
-      p("The values are totaled for each roadway segment. Higher Severity Index values indicate locations with a greater concentration of severe
-           crash outcomes."
-            )
+            uiOutput("map_description")
           )
+        ),
+        
+        br(),
+        
+        
+        leafletOutput(
+          "overviewMap",
+          height = "600px"
         )
         
         #end of overview tab
@@ -682,6 +678,30 @@ fatalPal <- colorFactor(
                         palette=c("red", "orange", "purple", "forestgreen", "dodgerblue"),
                         domain=fatalitiesdata$`Person_Type_Text_Format`
                           )
+
+#pedestrian injury colors 
+pedestrianSeverityLevels <- c(
+  "No Apparent Injury (O)",
+  "Possible Injury (C)",
+  "Suspected Minor Injury (B)",
+  "Suspected Serious Injury (A)",
+  "Fatal Injury (K)"
+)
+
+pedestrianSeverityPal <- colorFactor(
+  palette = c(
+    "gray",
+    "yellow",
+    "orange",
+    "red",
+    "darkred"
+  ),
+  domain = pedestrianSeverityLevels,
+  levels = pedestrianSeverityLevels,
+  ordered = TRUE
+)
+
+
 # UConn crash layer query URL
 uconn_all_crashes_url <- paste0(
   "https://gis.cti.uconn.edu/arcgis/rest/services/",
@@ -1655,6 +1675,76 @@ server <- function(input, output, session) {
                   values=~`Person_Type_Text_Format`,
                   title="Person Type")
     }
+     
+    else if (input$mapType == "pedestrian") {
+      
+      pedestrian_data <- individualdata %>%
+        filter(`Person Type Text Format` == "Pedestrian") %>%
+        select(
+          CrashId,
+          `Injury Status Text Format`,
+          `Direction nonmotorist was traveling`
+        )
+      
+      mapdata <- pedestrian_data %>%
+        left_join(
+          crashdata %>%
+            select(
+              CrashId,
+              latitude,
+              longitude,
+              `Date Of Crash`,
+              `Day of the Week Text Format`,
+              `Time of Crash`
+            ),
+          by = "CrashId"
+        ) %>%
+        filter(
+          !is.na(latitude),
+          !is.na(longitude)
+        )
+      
+      leaflet(data = mapdata) %>%
+        addProviderTiles(providers$CartoDB.Positron) %>%
+        
+        addPolygons(
+          data = newhaven,
+          color = "black",
+          weight = 3,
+          fill = FALSE
+        ) %>%
+        
+        addCircleMarkers(
+          lng = ~longitude,
+          lat = ~latitude,
+          radius = 3,
+          color = ~pedestrianSeverityPal(`Injury Status Text Format`),
+          fillColor = ~pedestrianSeverityPal(`Injury Status Text Format`),
+          fillOpacity = 0.6,
+          stroke = FALSE,
+          popup = ~paste0(
+            "<b>Crash ID:</b> ", CrashId,
+            "<br><b>Date:</b> ", `Date Of Crash`,
+            "<br><b>Day of the Week:</b> ", `Day of the Week Text Format`,
+            "<br><b>Time of Crash:</b> ", `Time of Crash`,
+            "<br><b>Pedestrian Injury Type:</b> ", `Injury Status Text Format`,
+            "<br><b>Direction of Pedestrian Travel:</b> ", `Direction nonmotorist was traveling`
+          )
+        ) %>%
+  
+        addLegend(
+          position = "topright",
+          pal = pedestrianSeverityPal,
+          values = pedestrianSeverityLevels,
+          labels = pedestrianSeverityLevels,
+          title = "Pedestrian Injury Severity",
+          opacity = 1
+        )
+      
+    }
+    
+    
+    
     
     
       })
@@ -2013,6 +2103,45 @@ server <- function(input, output, session) {
       " Days"
     )
   })
+  
+  output$map_description <- renderUI({
+      
+      req(input$mapType)
+      
+      if (input$mapType == "severity") {
+        
+        tagList(
+          p(
+            "The Severity Index Map identifies 500-foot roadway segments with crashes involving greater levels of injury severity. Only crashes with at least 1 possible injury were included in this map"
+          ),
+          
+          tags$strong(
+            "Severity Index = (12 × Number of Fatals) + (3 × Number of Suspected Serious Injuries) + (1 × Number of Suspected Minor or Possible Injuries)"
+          ),
+          
+          p(
+            "Higher SI values indicate 500-foot roadway segments with a greater concentration of severe crash outcomes."
+          )
+        )
+        
+      } else if (input$mapType == "fatalities") {
+        
+        p("This map displays the locations of all fatalities in New Haven.")
+        
+      } else if (input$mapType == "pedestrian") {
+        
+        p(
+          "This map displays crashes involving a pedestrian injury or fatality, with any injury type, including no injuries"
+        )
+        
+      } else {
+        
+        p(
+          "This map displays crashes resulting in at least one possible injury in New Haven."
+        )
+      }
+    })
+    
 } #server end bracket
 
 #launching server

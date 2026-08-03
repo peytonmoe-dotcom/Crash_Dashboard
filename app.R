@@ -253,13 +253,13 @@ ui <- dashboardPage(
          on the city-wide crash trends, neighborhood-level trends, and city-wide fatality statistics. Users can hover over each crash
          point, bar chart, and pie chart to see additional information. The Recent Crashes tab displays information 
          from the UConn Crash Repository, which is updated daily and includes crashes involving at least one possible injury as well 
-         as fatal crashes. Both injury and fatality data can be viewed for the last 30 days or last 90 days. Interactive tables are 
+         as fatal crashes. Both injury and fatality data can be viewed for the last 30 or 90 days and 6 or 12 months. Interactive tables are 
          also provided, allowing users to filter, sort, and search for crashes based on specific attributes.", style="font-size:20px")
         , 
         
         h4("Additional Information", style="text-decoration:underline; font-size:32px"),
         h3("The first four tabs are data from 1/1/21-6/11/26 (5.5 year analysis span), while the last tab
-           contains real-time information from the last 30 or 90 days that is updated daily from the UConn crash servers. 
+           contains real-time information from the last 30 or 90 days and 6 or 12 months that is updated daily from the UConn crash servers. 
            NOTE: it may take up to 60 seconds for all features and maps to load. ", style="font-size:20px;")
         ,
         
@@ -297,7 +297,7 @@ ui <- dashboardPage(
         ),
       
         
-        h4("Crash Maps",
+        h4("Crash Maps (1/1/21-6/11/2026)",
           style="font-size:35px"
         ),
         h4("The following maps are interative. For all crashes, fatalities, and pedestrian injuries zoom in and click on a dot to see additional features"),
@@ -308,7 +308,7 @@ ui <- dashboardPage(
             "All Crashes Map" = "crashes",
             "Crash Severity Index Map" = "severity",
             "All Fatalities Map" = "fatalities",
-            "All Pedestrian Injuries and Fatalities" = "pedestrian"
+            "Pedestrian Injury and Fatalites" = "pedestrian"
           ),
           selected = "crashes"
         ),
@@ -614,7 +614,10 @@ ui <- dashboardPage(
               label = "Time period:",
               choices = c(
                 "Last 30 Days" = 30,
-                "Last 90 Days" = 90
+                "Last 90 Days" = 90,
+                "Last 6 months" = 182,
+                "Last 12 months" = 365,
+                "Last 24 months" = 730
               ),
               selected = 30
             )
@@ -633,7 +636,7 @@ ui <- dashboardPage(
         
         h3("Crash Details"),
         
-        DTOutput("recentCrashTable")
+      DTOutput("recentCrashTable")
       )
     
      )#end of tab items 
@@ -689,7 +692,7 @@ pedestrianSeverityLevels <- c(
 )
 
 pedestrianSeverityPal <- colorFactor(
-  palette = c(
+ palette = c(
     "gray",
     "yellow",
     "orange",
@@ -702,14 +705,97 @@ pedestrianSeverityPal <- colorFactor(
 )
 
 
-# UConn crash layer query URL
+# UConn crash layer query URL LAYER 0 CRASH
 uconn_all_crashes_url <- paste0(
   "https://gis.cti.uconn.edu/arcgis/rest/services/",
   "Crash_Dashboards/ConnecticutCrash/FeatureServer/0/query"
 )
 
+# UConn crash layer query URL LAYER 1 PERSON 
+uconn_person_url <- paste0(
+  "https://gis.cti.uconn.edu/arcgis/rest/services/",
+  "Crash_Dashboards/ConnecticutCrash/FeatureServer/1/query"
+)
 
-# Download all New Haven crashes in batches
+get_nonparking_crash_ids <- function() {
+  
+  response <- httr2::request(uconn_all_crashes_url) |>
+    httr2::req_url_query(
+      where = paste(
+        "CrashTownName = 'New Haven'",
+        "AND LawEnforcementAgencyName = 'New Haven PD'",
+        "AND TrafficwayClassType <> 'Parking Lot'",
+        "AND CrashDateYear >= 2021"
+      ),
+      outFields = "CrashID",
+      returnGeometry = "false",
+      f = "json"
+    ) |>
+    httr2::req_timeout(60) %>%
+    httr2::req_perform()
+  
+  jsonlite::fromJSON(
+    httr2::resp_body_string(response)
+  )$features$attributes %>%
+    dplyr::distinct(CrashID)
+}
+
+get_live_person_types <- function() {
+  
+  response <- httr2::request(uconn_person_url) |>
+    httr2::req_url_query(
+      where = paste(
+        "CrashTownName = 'New Haven'",
+        "AND CrashDateYear >= 2021",
+        "AND LawEnforcementAgencyName = 'New Haven PD'"
+      ),
+      outFields = "CrashID,PersonType",
+      returnGeometry = "false",
+      f = "json"
+    ) |>
+    httr2::req_timeout(60) |>
+    httr2::req_perform()
+  
+  person_json <- jsonlite::fromJSON(
+    httr2::resp_body_string(response),
+    simplifyVector = FALSE
+  )
+  
+  person_data <- dplyr::bind_rows(
+    lapply(
+      person_json$features,
+      function(feature) {
+        as.data.frame(
+          feature$attributes,
+          stringsAsFactors = FALSE
+        )
+      }
+    )
+  )
+  
+  person_data |>
+    dplyr::transmute(
+      CrashID = as.character(CrashID),
+      PersonType = as.character(PersonType)
+    ) |>
+    dplyr::filter(
+      !is.na(CrashID),
+      !is.na(PersonType),
+      PersonType != ""
+    ) |>
+    dplyr::group_by(CrashID) |>
+    dplyr::summarise(
+      PersonType = paste(
+        sort(unique(PersonType)),
+        collapse = ", "
+      ),
+      .groups = "drop"
+    )
+}
+
+
+
+# Download all New Haven crashes from LAYER 0 CRASH
 get_live_newhaven_crashes <- function() {
   
   batch_size <- 500
@@ -806,12 +892,29 @@ get_live_newhaven_crashes <- function() {
         "Suspected Minor Injury (B)"
       )
     )
+#  person_types <- get_live_person_types()
   
+ # live_crashes <- live_crashes |>
+  #          dplyr::mutate(
+   #           CrashID = as.character(CrashID)
+  #  ) |>
+  #  dplyr::left_join(
+   #   person_types,
+  #    by = "CrashID"
+    #) |>
+  #  dplyr::mutate(
+   #   PersonType = dplyr::if_else(
+    #    is.na(PersonType) | PersonType == "",
+    #    "Not reported",
+    #    PersonType
+  #  )
+  #  )
   return(live_crashes)
 }
 
 #server set up
 server <- function(input, output, session) {
+  #live feed
   
   #fatalities by year
   output$yearlyfatalPlot <- renderPlotly({
@@ -1675,21 +1778,20 @@ server <- function(input, output, session) {
                   values=~`Person_Type_Text_Format`,
                   title="Person Type")
     }
-     
+    
     else if (input$mapType == "pedestrian") {
       
       pedestrian_data <- individualdata %>%
-        filter(`Person Type Text Format` == "Pedestrian") %>%
-        select(
+        dplyr::filter(
+          `Person Type Text Format` == "Pedestrian"
+        ) %>%
+        dplyr::select(
           CrashId,
-          `Injury Status Text Format`,
-          `Direction nonmotorist was traveling`
-        )
-      
-      mapdata <- pedestrian_data %>%
-        left_join(
+          `Injury Status Text Format`
+        ) %>%
+        dplyr::left_join(
           crashdata %>%
-            select(
+            dplyr::select(
               CrashId,
               latitude,
               longitude,
@@ -1699,12 +1801,12 @@ server <- function(input, output, session) {
             ),
           by = "CrashId"
         ) %>%
-        filter(
+        dplyr::filter(
           !is.na(latitude),
           !is.na(longitude)
         )
       
-      leaflet(data = mapdata) %>%
+      leaflet(data = pedestrian_data) %>%
         addProviderTiles(providers$CartoDB.Positron) %>%
         
         addPolygons(
@@ -1717,34 +1819,37 @@ server <- function(input, output, session) {
         addCircleMarkers(
           lng = ~longitude,
           lat = ~latitude,
-          radius = 3,
-          color = ~pedestrianSeverityPal(`Injury Status Text Format`),
-          fillColor = ~pedestrianSeverityPal(`Injury Status Text Format`),
-          fillOpacity = 0.6,
-          stroke = FALSE,
+          radius = 4,
+          color = ~pedestrianSeverityPal(
+            `Injury Status Text Format`
+          ),
+          fillColor = ~pedestrianSeverityPal(
+            `Injury Status Text Format`
+          ),
+          fillOpacity = 0.7,
+          stroke = TRUE,
+          weight = 1,
+          
           popup = ~paste0(
             "<b>Crash ID:</b> ", CrashId,
             "<br><b>Date:</b> ", `Date Of Crash`,
-            "<br><b>Day of the Week:</b> ", `Day of the Week Text Format`,
-            "<br><b>Time of Crash:</b> ", `Time of Crash`,
-            "<br><b>Pedestrian Injury Type:</b> ", `Injury Status Text Format`,
-            "<br><b>Direction of Pedestrian Travel:</b> ", `Direction nonmotorist was traveling`
+            "<br><b>Day of the Week:</b> ",
+            `Day of the Week Text Format`,
+            "<br><b>Time of Crash:</b> ",
+            `Time of Crash`,
+            "<br><b>Pedestrian Injury Severity:</b> ",
+            `Injury Status Text Format`
           )
         ) %>%
-  
+        
         addLegend(
           position = "topright",
           pal = pedestrianSeverityPal,
-          values = pedestrianSeverityLevels,
-          labels = pedestrianSeverityLevels,
+          values = ~`Injury Status Text Format`,
           title = "Pedestrian Injury Severity",
           opacity = 1
         )
-      
     }
-    
-    
-    
     
     
       })
@@ -1878,7 +1983,54 @@ server <- function(input, output, session) {
     ggplotly(FM, tooltip = "text")
   })
   
+#recent crashes live 
+  
+  # Refresh general crash data every hour
+  recent_crashes_live <- reactivePoll(
+    intervalMillis = 3600000,
+    session = session,
+    
+    checkFunc = function() {
+      floor(as.numeric(Sys.time()) / 3600)
+    },
+    
+    valueFunc = function() {
+      get_live_newhaven_crashes()
+    }
+  )
+  
+  
+  # Filter the correct dataset based on crash type and time period
+  filtered_recent_crashes <- reactive({
+    
+    req(input$crashType, input$dayRange)
+    
+    number_of_days <- as.numeric(input$dayRange)
+    cutoff_date <- Sys.Date() - number_of_days
+  
+      
+      recent_data <- recent_crashes_live() %>%
+        filter(
+          CrashDate >= cutoff_date,
+          CrashDate <= Sys.Date()
+        )
+      
+      if (input$crashType == "Fatal Crashes") {
+        
+        recent_data <- recent_data %>%
+          filter(
+            MostSevereInjury == "Fatal Injury (K)"
+          )
+      }
+    
+    recent_data
+  })
+  
+#recent crashes map
+  
   output$recentCrashMap <- renderLeaflet({
+    
+    req(input$crashType)
     
     map_data <- filtered_recent_crashes()
     
@@ -1892,156 +2044,158 @@ server <- function(input, output, session) {
         )
       )
     )
-    
-    leaflet(map_data) %>%
-      addProviderTiles(
-        providers$CartoDB.Positron
-      ) %>%
-      
-      addPolygons(
-        data = newhaven,
-        color = "black",
-        weight = 2,
-        fill = FALSE
-      ) %>%
-      
-      addCircleMarkers(
-        radius = 4,
-        
-        color = ~recentSeverityPal(MostSevereInjury),
-        fillColor = ~recentSeverityPal(MostSevereInjury),
-        
-        fillOpacity = 0.8,
-        stroke = TRUE,
-        weight = 1,
-        
-        popup = ~paste0(
-          "<b>Crash ID:</b> ", CrashID,
-          
-          "<br><b>Date:</b> ", CrashDate,
-          
-          "<br><b>Time:</b> ",
-          ifelse(
-            is.na(CrashTimeHour),
-            "Not reported",
-            paste0(sprintf("%02d", CrashTimeHour), ":00")
-          ),
-          
-          "<br><b>Injury Severity:</b> ",
-          ifelse(
-            is.na(MostSevereInjury),
-            "Not reported",
-            MostSevereInjury
-          ),
-          
-          "<br><b>Road:</b> ",
-          ifelse(
-            is.na(NameOfRoadway) | NameOfRoadway == "",
-            "Not reported",
-            NameOfRoadway
-          ),
-          
-          "<br><b>Cross Street:</b> ",
-          ifelse(
-            is.na(NameOfIntersectingRoadway) |
-              NameOfIntersectingRoadway == "",
-            "Not reported",
-            NameOfIntersectingRoadway
-          ),
-          
-          "<br><b>Specific Location:</b> ",
-          ifelse(
-            is.na(CrashSpecificLocation) |
-              CrashSpecificLocation == "",
-            "Not reported",
-            CrashSpecificLocation
-          ),
-          
-          "<br><b>Weather:</b> ",
-          ifelse(
-            is.na(WeatherCondition),
-            "Not reported",
-            WeatherCondition
-          ),
-          
-          "<br><b>Light:</b> ",
-          ifelse(
-            is.na(LightCondition),
-            "Not reported",
-            LightCondition
-          ),
-          
-          "<br><b>Road Surface:</b> ",
-          ifelse(
-            is.na(TrafficSurfaceCondition),
-            "Not reported",
-            TrafficSurfaceCondition
-          ),
-          
-          "<br><b>First Harmful Event:</b> ",
-          ifelse(
-            is.na(FirstHarmfulEvent),
-            "Not reported",
-            FirstHarmfulEvent
-          )
-        )
-      ) %>%
-      
-      addLegend(
-        position = "topright",
-        pal = recentSeverityPal,
-        values = ~MostSevereInjury,
-        title = "Injury Severity",
-        opacity = 1
-      )
-  })
   
-  # Refresh UConn fatal crash data every hour
-  # Refresh all New Haven injury crash data every hour
-  recent_crashes_live <- reactivePoll(
-    intervalMillis = 3600000,
-    session = session,
-    
-    checkFunc = function() {
-      Sys.time()
-    },
-    
-    valueFunc = function() {
-      get_live_newhaven_crashes()
-    }
-  )
+      
+#fatal and injury
+      
+      leaflet(data = map_data) %>%
+        addProviderTiles(providers$CartoDB.Positron) %>%
+        
+        addPolygons(
+          data = newhaven,
+          color = "black",
+          weight = 2,
+          fill = FALSE
+        ) %>%
+        
+        addCircleMarkers(
+          radius = 4,
+          color = ~recentSeverityPal(MostSevereInjury),
+          fillColor = ~recentSeverityPal(MostSevereInjury),
+          fillOpacity = 0.8,
+          stroke = TRUE,
+          weight = 1,
+          
+          popup = ~paste0(
+            "<b>Crash ID:</b> ", CrashID,
+            "<br><b>Date:</b> ", CrashDate,
+            
+            "<br><b>Time:</b> ",
+            ifelse(
+              is.na(CrashTimeHour),
+              "Not reported",
+              paste0(sprintf("%02d", CrashTimeHour), ":00")
+            ),
+            
+            "<br><b>Injury Severity:</b> ",
+            ifelse(
+              is.na(MostSevereInjury) |
+                MostSevereInjury == "",
+              "Not reported",
+              MostSevereInjury
+            ),
+            
+            "<br><b>Road:</b> ",
+            ifelse(
+              is.na(NameOfRoadway) |
+                NameOfRoadway == "",
+              "Not reported",
+              NameOfRoadway
+            ),
+            
+            "<br><b>Cross Street:</b> ",
+            ifelse(
+              is.na(NameOfIntersectingRoadway) |
+                NameOfIntersectingRoadway == "",
+              "Not reported",
+              NameOfIntersectingRoadway
+            ),
+            
+            "<br><b>Specific Location:</b> ",
+            ifelse(
+              is.na(CrashSpecificLocation) |
+                CrashSpecificLocation == "",
+              "Not reported",
+              CrashSpecificLocation
+            ) 
+          )
+        ) %>%
+      addLegend(
+          position = "topright",
+          pal = recentSeverityPal,
+          values = ~MostSevereInjury,
+          title = "Crash Injury Severity",
+          opacity = 1
+        )
+    })
+  
+#recent table
   
   output$recentCrashTable <- renderDT({
     
-    table_data <- filtered_recent_crashes() %>%
-      sf::st_drop_geometry() %>%
-      
-      dplyr::mutate(
-        Time = ifelse(
-          is.na(CrashTimeHour),
-          "Not reported",
-          paste0(sprintf("%02d", CrashTimeHour), ":00")
-        )
-      ) %>%
-      
-      dplyr::arrange(
-        dplyr::desc(CrashDate),
-        dplyr::desc(CrashTimeHour)
-      ) %>%
-      
-      dplyr::select(
-        `Crash ID` = CrashID,
-        Date = CrashDate,
-        Time,
-        `Injury Severity` = MostSevereInjury,
-        Road = NameOfRoadway,
-        `Cross Street` = NameOfIntersectingRoadway,
-        `Specific Location` = CrashSpecificLocation,
-        Weather = WeatherCondition,
-        Light = LightCondition,
-        `Road Surface` = TrafficSurfaceCondition,
-        `First Harmful Event` = FirstHarmfulEvent
+    req(input$crashType)
+    
+    table_source <- filtered_recent_crashes()
+    
+    shiny::validate(
+      shiny::need(
+        nrow(table_source) > 0,
+        "No records were reported during the selected period."
       )
+    )
+    
+    if (input$crashType == "Pedestrian Injury and Fatalities") {
+      
+      table_data <- table_source %>%
+        sf::st_drop_geometry() %>%
+        
+        dplyr::mutate(
+          Time = ifelse(
+            is.na(CrashTimeHour),
+            "Not reported",
+            paste0(sprintf("%02d", CrashTimeHour), ":00")
+          )
+        ) %>%
+        
+        dplyr::arrange(
+          dplyr::desc(CrashDate),
+          dplyr::desc(CrashTimeHour)
+        ) %>%
+        
+        dplyr::select(
+          `Crash ID` = CrashID,
+          Date = CrashDate,
+          Time,
+          `Pedestrian Injury Severity` = InjuryStatus,
+          Age,
+          Gender,
+          Road = NameOfRoadway,
+          `Specific Location` = CrashSpecificLocation
+        )
+      
+    } else {
+      
+      table_data <- table_source %>%
+        sf::st_drop_geometry() %>%
+        
+        dplyr::mutate(
+          Time = ifelse(
+            is.na(CrashTimeHour),
+            "Not reported",
+            paste0(sprintf("%02d", CrashTimeHour), ":00")
+          )
+        ) %>%
+        
+        dplyr::arrange(
+          dplyr::desc(CrashDate),
+          dplyr::desc(CrashTimeHour)
+        ) %>%
+        
+        dplyr::select(
+          `Crash ID` = CrashID,
+          Date = CrashDate,
+          Time,
+          `Injury Severity` = MostSevereInjury,
+          Road = NameOfRoadway,
+          `Cross Street` = NameOfIntersectingRoadway,
+          `Specific Location` = CrashSpecificLocation,
+          Weather = WeatherCondition,
+          Light = LightCondition,
+          `Road Surface` = TrafficSurfaceCondition,
+          `First Harmful Event` = FirstHarmfulEvent
+        )
+    }
+    
     table_data <- table_data %>%
       dplyr::mutate(
         dplyr::across(
@@ -2053,10 +2207,12 @@ server <- function(input, output, session) {
           )
         )
       )
+    
     DT::datatable(
       table_data,
       rownames = FALSE,
       filter = "top",
+      
       options = list(
         pageLength = 10,
         scrollX = TRUE,
@@ -2065,44 +2221,32 @@ server <- function(input, output, session) {
         )
       )
     )
-  })
+  }) 
   
   
-  # Filter live crashes based on the selected type and time period
-  filtered_recent_crashes <- reactive({
-    
-    req(input$crashType)
-    req(input$dayRange)
-    
-    number_of_days <- as.numeric(input$dayRange)
-    cutoff_date <- Sys.Date() - number_of_days
-    
-    recent_data <- recent_crashes_live() %>%
-      dplyr::filter(
-        CrashDate >= cutoff_date,
-        CrashDate <= Sys.Date()
-      )
-    
-    if (input$crashType == "Fatal Crashes") {
-      
-      recent_data <- recent_data %>%
-        dplyr::filter(
-          MostSevereInjury == "Fatal Injury (K)"
-        )
-    }
-    
-    recent_data
-  })
+#title
   
   output$recentCrashTitle <- renderText({
     
+    req(input$crashType, input$dayRange)
+    
+    time_label <- dplyr::case_when(
+      input$dayRange == "30"  ~ "Last 30 Days",
+      input$dayRange == "90"  ~ "Last 90 Days",
+      input$dayRange == "182" ~ "Last 6 Months",
+      input$dayRange == "365" ~ "Last 12 Months",
+      input$dayRange == "730" ~ "Last 24 Months",
+      TRUE ~ paste0("Last ", input$dayRange, " Days")
+    )
+    
     paste0(
       input$crashType,
-      " — Last ",
-      input$dayRange,
-      " Days"
+      " — ",
+      time_label
     )
   })
+  
+
   
   output$map_description <- renderUI({
       
@@ -2143,6 +2287,85 @@ server <- function(input, output, session) {
     })
     
 } #server end bracket
-
+get_live_person_types <- function() {
+  
+  batch_size <- 500
+  offset <- 0
+  person_batches <- list()
+  
+  repeat {
+    
+    response <- httr2::request(uconn_person_url) |>
+      httr2::req_url_query(
+        where = paste(
+          "CrashTownName = 'New Haven'",
+          "AND CrashDateYear >= 2021",
+          "AND LawEnforcementAgencyName = 'New Haven PD'"
+        ),
+        outFields = "CrashID,PersonType",
+        returnGeometry = "false",
+        orderByFields = "CrashID",
+        resultOffset = offset,
+        resultRecordCount = batch_size,
+        f = "json"
+      ) |>
+      httr2::req_timeout(60) |>
+      httr2::req_perform()
+    
+    person_json <- jsonlite::fromJSON(
+      httr2::resp_body_string(response),
+      simplifyVector = FALSE
+    )
+    
+    if (!is.null(person_json$error)) {
+      stop(person_json$error$message)
+    }
+    
+    features <- person_json$features
+    
+    if (length(features) == 0) {
+      break
+    }
+    
+    person_batch <- dplyr::bind_rows(
+      lapply(
+        features,
+        function(feature) {
+          as.data.frame(
+            feature$attributes,
+            stringsAsFactors = FALSE
+          )
+        }
+      )
+    )
+    
+    person_batches[[length(person_batches) + 1]] <- person_batch
+    
+    if (length(features) < batch_size) {
+      break
+    }
+    
+    offset <- offset + batch_size
+  }
+  
+  dplyr::bind_rows(person_batches) |>
+    dplyr::transmute(
+      CrashID = as.character(CrashID),
+      PersonType = as.character(PersonType)
+    ) |>
+    dplyr::filter(
+      !is.na(CrashID),
+      !is.na(PersonType),
+      PersonType != ""
+    ) |>
+    dplyr::group_by(CrashID) |>
+    dplyr::summarise(
+      PersonType = paste(
+        sort(unique(PersonType)),
+        collapse = ", "
+      ),
+      .groups = "drop"
+    )
+}
 #launching server
 shinyApp(ui, server)

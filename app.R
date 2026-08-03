@@ -300,7 +300,8 @@ ui <- dashboardPage(
         h4("Crash Maps (1/1/21-6/11/2026)",
           style="font-size:35px"
         ),
-        h4("The following maps are interative. For all crashes, fatalities, and pedestrian injuries zoom in and click on a dot to see additional features"),
+        h4("The following maps are interative. For all crashes, fatalities, and pedestrian injuries zoom in and click on a dot to see additional features. 
+           For the Severity Index map, click on a road to see its SI score and number of crashes on the 500 foot segment. "),
         selectInput(
           inputId = "mapType",
           label = "Select Map",

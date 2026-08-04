@@ -306,14 +306,15 @@ ui <- dashboardPage(
           inputId = "mapType",
           label = "Select Map",
           choices = c(
-            "All Crashes Map" = "crashes",
+            "Pedestrian Injury and Fatalites" = "pedestrian",
             "Crash Severity Index Map" = "severity",
             "All Fatalities Map" = "fatalities",
-            "Pedestrian Injury and Fatalites" = "pedestrian"
+            "All Crashes Map" = "crashes"
+            
           ),
-          selected = "crashes"
+          selected = "pedestrian"
         ),
-        
+      
         tags$details(
           open = TRUE,
           
@@ -335,6 +336,23 @@ ui <- dashboardPage(
         ),
         
         br(),
+        
+       # fluidPage(
+        #  titlePanel("Select by Injury Type"),
+         # checkboxGroupInput("checkboxlabel", 
+                             #set name and initial value
+                           #  "Injury Type"),
+          #checkbox groups
+      #    checkboxGroupInput("injuryType", NULL,
+                             #names you want to show 
+               #              choiceNames = list("No Apparent Injury", "Suspected Minor Injury", "Suspected Serious Injury", "Possible Injury", "Fatal Injury"),
+                             #actual names in individual data
+                #            choiceValues = list("No Apparent Injury (O)", "Suspected Minor Injury (B)", "Suspected Serious Injury (A)", "Possible Injury (C)", "Fatal Injury (K)"),
+                 #           select = c("No Apparent Injury (O)", "Suspected Minor Injury (B)", "Suspected Serious Injury (A)", "Possible Injury (C)", "Fatal Injury (K)")
+   #     ),
+        #server output name 
+       # tableOutput("checkdata")
+     #   ),
         
         
         leafletOutput(
@@ -917,6 +935,12 @@ get_live_newhaven_crashes <- function() {
 #server set up
 server <- function(input, output, session) {
   #live feed
+  #output$checkdata <- renderTable({
+    
+   # req(input$injuryType)
+    
+  #  individualdata %>% filter(`Injury Status Text Format` %in% input$injuryType)
+   #  })
   
   #fatalities by year
   output$yearlyfatalPlot <- renderPlotly({

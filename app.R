@@ -591,6 +591,7 @@ ui <- dashboardPage(
           "Recent Crashes",
           style = "font-size:40px; font-weight:bold; text-decoration:underline;"
         ),
+        h3("Please note it may take up to 30 seconds for all the maps to load once the tab has been clicked."),
         
         fluidRow(
           column(
